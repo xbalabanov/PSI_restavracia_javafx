@@ -4,7 +4,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+/**
+ * Singleton class responsible for managing the database connection.
+ * Uses PostgreSQL as the database system.
+ */
 public class DBConnection {
+
     private static DBConnection instance;
     private Connection connection;
 
@@ -13,6 +18,9 @@ public class DBConnection {
     private static final String USER = "postgres";
     private static final String PASSWORD = "postgres";
 
+    /**
+     * Private constructor that initializes the database connection.
+     */
     private DBConnection() {
         try {
             Class.forName("org.postgresql.Driver");
@@ -27,6 +35,11 @@ public class DBConnection {
         }
     }
 
+    /**
+     * Returns the single instance of DBConnection.
+     *
+     * @return DBConnection instance
+     */
     public static DBConnection getInstance() {
         if (instance == null) {
             instance = new DBConnection();
@@ -34,10 +47,18 @@ public class DBConnection {
         return instance;
     }
 
+    /**
+     * Returns the active database connection.
+     *
+     * @return Connection object
+     */
     public Connection getConnection() {
         return connection;
     }
 
+    /**
+     * Closes the database connection if it is open.
+     */
     public void closeConnection() {
         try {
             if (connection != null && !connection.isClosed()) {

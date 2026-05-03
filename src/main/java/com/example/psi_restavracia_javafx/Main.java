@@ -9,8 +9,17 @@ import javafx.scene.layout.VBox;
 import javafx.geometry.Insets;
 import ui.*;
 
+/**
+ * Main entry point of the restaurant management JavaFX application.
+ * Initializes the primary stage and sets up the main UI layout.
+ */
 public class Main extends Application {
 
+    /**
+     * Starts the JavaFX application and builds the main window.
+     *
+     * @param primaryStage the main application window
+     */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Reštaurácia - Správa objednávok");
@@ -34,6 +43,11 @@ public class Main extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Creates the header section of the UI.
+     *
+     * @return VBox containing title and subtitle
+     */
     private VBox createHeader() {
         VBox header = new VBox();
         header.setPadding(new Insets(15));
@@ -49,6 +63,11 @@ public class Main extends Application {
         return header;
     }
 
+    /**
+     * Creates the main tab panel with all use cases.
+     *
+     * @return configured TabPane
+     */
     private TabPane createTabPane() {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -100,6 +119,11 @@ public class Main extends Application {
         return tabPane;
     }
 
+    /**
+     * Launches the JavaFX application.
+     *
+     * @param args command-line arguments
+     */
     public static void main(String[] args) {
         launch(args);
     }

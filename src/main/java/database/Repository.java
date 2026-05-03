@@ -5,13 +5,24 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+
+/**
+ * Repository class responsible for database access.
+ * Handles CRUD operations for all main entities using JDBC.
+ */
 public class Repository {
     private Connection connection;
-
+    /**
+     * Initializes repository and obtains database connection.
+     */
     public Repository() {
         this.connection = DBConnection.getInstance().getConnection();
     }
-
+    /**
+     * Retrieves all tables with computed occupancy status.
+     *
+     * @return list of tables
+     */
     // === STOLY ===
     public List<Stol> getAllStoly() {
         List<Stol> stoly = new ArrayList<>();
@@ -50,7 +61,12 @@ public class Repository {
         }
         return stoly;
     }
-
+    /**
+     * Updates the status of a table.
+     *
+     * @param stolId ID of the table
+     * @param stav new status
+     */
     public void updateStolStav(int stolId, String stav) {
         try {
             String sql = "UPDATE stoly SET stav = ? WHERE id = ?";
@@ -64,6 +80,11 @@ public class Repository {
     }
 
     // === MENU ===
+    /**
+     * Retrieves all menu items from the database.
+     *
+     * @return list of menu items
+     */
     public List<Menu> getAllMenu() {
         List<Menu> menu = new ArrayList<>();
         try {
@@ -86,6 +107,11 @@ public class Repository {
     }
 
     // === OBJEDNAVKY (UC01) ===
+    /**
+     * Creates a new order.
+     *
+     * @return generated ID or -1 if failed
+     */
     public int createObjednavka(Objednavka objednavka) {
         try {
             String sql = "INSERT INTO objednavky (stav, cas, stol_id) VALUES (?, ?, ?) RETURNING id";
@@ -103,7 +129,12 @@ public class Repository {
         }
         return -1;
     }
-
+    /**
+     * Adds an ordered item to a specific order.
+     *
+     * @param objednavkaId ID of the order
+     * @param jedlo ordered item to add
+     */
     public void addObjedlaneJedlo(int objednavkaId, ObjednaneJedlo jedlo) {
         try {
             String sql = "INSERT INTO objednane_jedla (objednavka_id, menu_id, pocet, cena) VALUES (?, ?, ?, ?)";
@@ -117,7 +148,11 @@ public class Repository {
             e.printStackTrace();
         }
     }
-
+    /**
+     * Deletes all ordered items for a given order.
+     *
+     * @param objednavkaId ID of the order
+     */
     public void deleteObjednaneJedla(int objednavkaId) {
         try {
             String sql = "DELETE FROM objednane_jedla WHERE objednavka_id = ?";
@@ -128,11 +163,20 @@ public class Repository {
             e.printStackTrace();
         }
     }
-
+    /**
+     * Retrieves all orders.
+     *
+     * @return list of all orders
+     */
     public List<Objednavka> getAllObjednavky() {
         return getObjednavkyByStatus(-1);
     }
-
+    /**
+     * Retrieves orders filtered by status.
+     *
+     * @param status order status (-1 = all)
+     * @return list of orders
+     */
     public List<Objednavka> getObjednavkyByStatus(int status) {
         List<Objednavka> objednavky = new ArrayList<>();
         try {
@@ -164,7 +208,11 @@ public class Repository {
         }
         return objednavky;
     }
-
+    /**
+     * Loads ordered items for a given order from the database.
+     *
+     * @param objednavka order to populate
+     */
     private void loadObjednaneJedla(Objednavka objednavka) {
         try {
             String sql = """
@@ -203,7 +251,12 @@ public class Repository {
             e.printStackTrace();
         }
     }
-
+    /**
+     * Updates quantity of an ordered item or deletes it if quantity is zero or less.
+     *
+     * @param objednaneJedloId ID of the ordered item
+     * @param novyPocet new quantity
+     */
     public void updateObjednaneJedloPocet(int objednaneJedloId, int novyPocet) {
         try {
             if (novyPocet <= 0) {
@@ -222,7 +275,12 @@ public class Repository {
             e.printStackTrace();
         }
     }
-
+    /**
+     * Updates the status of an order.
+     *
+     * @param objednavkaId ID of the order
+     * @param stav new status
+     */
     public void updateObjednavkaStav(int objednavkaId, int stav) {
         try {
             String sql = "UPDATE objednavky SET stav = ? WHERE id = ?";
@@ -236,10 +294,20 @@ public class Repository {
     }
 
     // === REZERVACIE (UC03) ===
+    /**
+     * Retrieves all unpaid orders.
+     *
+     * @return list of unpaid orders
+     */
     public List<Objednavka> getUnpaidObjednavky() {
         return getObjednavkyWithStatusNot(4);
     }
-
+    /**
+     * Retrieves orders excluding a specific status.
+     *
+     * @param excludedStatus status to exclude
+     * @return list of orders
+     */
     public List<Objednavka> getObjednavkyWithStatusNot(int excludedStatus) {
         List<Objednavka> objednavky = new ArrayList<>();
         try {
@@ -267,6 +335,12 @@ public class Repository {
         return objednavky;
     }
 
+    /**
+     * Creates a new reservation.
+     *
+     * @param rezervacia reservation object
+     * @return generated ID or -1 if failed
+     */
     public int createRezervacia(Rezervacia rezervacia) {
         try {
             String sql = "INSERT INTO rezervacie (stav, cas, stol_id, zakaznik_meno, zakaznik_kontakt, pocet_osob, poznamky) "
@@ -291,6 +365,11 @@ public class Repository {
         return -1;
     }
 
+    /**
+     * Retrieves all reservations.
+     *
+     * @return list of reservations
+     */
     public List<Rezervacia> getAllRezerbacie() {
         List<Rezervacia> rezervacie = new ArrayList<>();
         try {
@@ -316,6 +395,12 @@ public class Repository {
         return rezervacie;
     }
 
+    /**
+     * Updates reservation status.
+     *
+     * @param rezervaciaId reservation ID
+     * @param stav new status
+     */
     public void updateRezervaciaStav(int rezervaciaId, String stav) {
         try {
             String sql = "UPDATE rezervacie SET stav = ? WHERE id = ?";
@@ -328,6 +413,11 @@ public class Repository {
         }
     }
 
+    /**
+     * Deletes a reservation.
+     *
+     * @param rezervaciaId reservation ID
+     */
     public void deleteRezervacia(int rezervaciaId) {
         try {
             String sql = "DELETE FROM rezervacie WHERE id = ?";
@@ -340,6 +430,9 @@ public class Repository {
     }
 
     // === UCTY & PLATBY (UC04) ===
+    /**
+     * Creates a bill (account) for an order.
+     */
     public int createUcet(int objednavkaId, double suma) {
         try {
             String sql = "INSERT INTO ucty (stav, suma, cas, objednavka_id) VALUES (?, ?, ?, ?) RETURNING id";
@@ -359,6 +452,14 @@ public class Repository {
         return -1;
     }
 
+    /**
+     * Creates a payment record.
+     *
+     * @param ucetId account ID
+     * @param sposob payment method
+     * @param suma amount
+     * @return generated ID or -1 if failed
+     */
     public int createPlatba(int ucetId, String sposob, double suma) {
         try {
             String sql = "INSERT INTO platby (sposob, stav, suma, cas, ucet_id) VALUES (?, ?, ?, ?, ?) RETURNING id";
@@ -379,6 +480,12 @@ public class Repository {
         return -1;
     }
 
+    /**
+     * Updates bill (account) status.
+     *
+     * @param ucetId account ID
+     * @param stav new status
+     */
     public void updateUcetStav(int ucetId, String stav) {
         try {
             String sql = "UPDATE ucty SET stav = ? WHERE id = ?";
@@ -392,6 +499,13 @@ public class Repository {
     }
 
     // === REKLAMACIE (UC02) ===
+
+    /**
+     * Creates a new complaint.
+     *
+     * @param reklamacia complaint object
+     * @return generated ID or -1 if failed
+     */
     public int createReklamacia(Reklamacia reklamacia) {
         try {
             String sql = "INSERT INTO reklamacie (dovod, stav, cas, objednavka_id, zakaznik_id) " +
@@ -413,6 +527,14 @@ public class Repository {
         return -1;
     }
 
+
+    /**
+     * Updates complaint status and result.
+     *
+     * @param reklamaciaId complaint ID
+     * @param stav new status
+     * @param vysledok result of complaint
+     */
     public void updateReklamaciaStav(int reklamaciaId, String stav, String vysledok) {
         try {
             String sql = "UPDATE reklamacie SET stav = ?, vysledok = ? WHERE id = ?";

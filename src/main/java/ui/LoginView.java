@@ -7,6 +7,10 @@ import javafx.scene.layout.HBox;
 import models.Casnik;
 import database.Database;
 
+/**
+ * UI component representing login form for waiters (Casnik).
+ * Handles user input, basic authentication, and login state.
+ */
 public class LoginView extends VBox {
 
     private TextField usernameField;
@@ -15,6 +19,9 @@ public class LoginView extends VBox {
     private Label statusLabel;
     private Casnik loggedInCasnik;
 
+    /**
+     * Initializes login form UI components and layout.
+     */
     public LoginView() {
         this.setPadding(new Insets(20));
         this.setSpacing(15);
@@ -49,6 +56,10 @@ public class LoginView extends VBox {
                 statusLabel);
     }
 
+    /**
+     * Handles login button action.
+     * Performs simple validation and simulated authentication.
+     */
     private void handleLogin() {
         String username = usernameField.getText();
         String password = passwordField.getText();
@@ -69,6 +80,11 @@ public class LoginView extends VBox {
         }
     }
 
+    /**
+     * Returns currently logged-in waiter.
+     *
+     * @return logged-in Casnik or null if not logged in
+     */
     public Casnik getLoggedInCasnik() {
         return loggedInCasnik;
     }
