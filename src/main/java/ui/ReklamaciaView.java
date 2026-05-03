@@ -6,14 +6,22 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
 import models.Reklamacia;
 import models.Objednavka;
+import models.ObjednaneJedlo;
 import services.ReklamaciaService;
 import database.Database;
 import database.Repository;
 import java.time.LocalDateTime;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+
 public class ReklamaciaView extends VBox {
 
     private ComboBox<Objednavka> objednavkaCombo;
+    private ListView<ObjednaneJedlo> polozkyList;
+    private Map<Integer, Spinner<Integer>> quantitySpinners = new HashMap<>();
     private TextArea problemArea;
     private Button createButton;
     private Button approveButton;
@@ -56,6 +64,39 @@ public class ReklamaciaView extends VBox {
             }
         });
         refreshOrderList();
+        objednavkaCombo.setOnAction(e -> handleOrderSelected());
+
+        // Items selection
+        Label polozkyLabel = new Label("Vyberte položky na reklamáciu (viacnásobný výber pomocou Ctrl/Cmd):");
+        polozkyList = new ListView<>();
+        polozkyList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        polozkyList.setPrefHeight(150);
+        polozkyList.setCellFactory(lv -> new ListCell<ObjednaneJedlo>() {
+            @Override
+            protected void updateItem(ObjednaneJedlo item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    HBox hbox = new HBox(10);
+                    hbox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                    Label label = new Label(item.getMenu().getNazov() + " (max " + item.getPocet() + "ks) - " + item.getCena() + "€/ks");
+                    
+                    Spinner<Integer> spinner = quantitySpinners.get(item.getId());
+                    if (spinner == null) {
+                        spinner = new Spinner<>(1, item.getPocet(), 1);
+                        spinner.setPrefWidth(70);
+                        spinner.setEditable(true);
+                        quantitySpinners.put(item.getId(), spinner);
+                    }
+                    
+                    hbox.getChildren().addAll(label, spinner);
+                    setGraphic(hbox);
+                    setText(null);
+                }
+            }
+        });
 
         // Problem description
         Label problemLabel = new Label("Popis problému:");
@@ -110,6 +151,7 @@ public class ReklamaciaView extends VBox {
                 titleLabel,
                 new Separator(),
                 orderLabel, objednavkaCombo,
+                polozkyLabel, polozkyList,
                 problemLabel, problemArea,
                 createButton,
                 sep,
@@ -122,20 +164,42 @@ public class ReklamaciaView extends VBox {
 
     public void refreshOrderList() {
         objednavkaCombo.getItems().clear();
-        objednavkaCombo.getItems().addAll(repository.getAllObjednavky());
+        objednavkaCombo.getItems().addAll(repository.getObjednavkyByStatus(3)); // Only vybavena
+    }
+
+    private void handleOrderSelected() {
+        Objednavka selected = objednavkaCombo.getValue();
+        polozkyList.getItems().clear();
+        quantitySpinners.clear();
+        if (selected != null) {
+            polozkyList.getItems().addAll(selected.getPolozky());
+        }
     }
 
     private void handleCreateReklamacia() {
         Objednavka selected = objednavkaCombo.getValue();
+        List<ObjednaneJedlo> selectedPolozky = new ArrayList<>(polozkyList.getSelectionModel().getSelectedItems());
         String problem = problemArea.getText();
 
-        if (selected == null || problem.isEmpty()) {
-            showAlert("Vyberte objednávku a opíšte problém!");
+        if (selected == null || selectedPolozky.isEmpty() || problem.isEmpty()) {
+            showAlert("Vyberte objednávku, aspoň jednu položku a opíšte problém!");
             return;
         }
 
-        currentReklamacia = reklamaciaService.createReklamacia(selected, 1, problem);
+        StringBuilder fullProblem = new StringBuilder();
+        fullProblem.append("Položky: ");
+        for (ObjednaneJedlo oj : selectedPolozky) {
+            int reclaimQty = quantitySpinners.get(oj.getId()).getValue();
+            fullProblem.append(oj.getMenu().getNazov()).append(" (").append(reclaimQty).append("ks z ").append(oj.getPocet()).append("ks), ");
+        }
+        fullProblem.append("\nProblém: ").append(problem);
+
+        currentReklamacia = reklamaciaService.createReklamacia(selected, 1, fullProblem.toString());
         repository.createReklamacia(currentReklamacia);
+
+        // Reset inputs
+        problemArea.clear();
+        polozkyList.getSelectionModel().clearSelection();
 
         statusLabel.setText("Reklamácia vytvorená - Čakanie na spracovanie");
         statusLabel.setStyle("-fx-text-fill: orange;");
@@ -154,13 +218,24 @@ public class ReklamaciaView extends VBox {
         repository.updateReklamaciaStav(currentReklamacia.getId(), "schvalena",
                 customerWaits ? "vymena" : "vracanie_penazi");
 
+        // If refund, update order items quantity
+        if (!customerWaits) {
+            List<ObjednaneJedlo> selectedPolozky = new ArrayList<>(polozkyList.getSelectionModel().getSelectedItems());
+            for (ObjednaneJedlo oj : selectedPolozky) {
+                int reclaimQty = quantitySpinners.get(oj.getId()).getValue();
+                int newQty = oj.getPocet() - reclaimQty;
+                repository.updateObjednaneJedloPocet(oj.getId(), newQty);
+                oj.setPocet(newQty); // Update local model too
+            }
+        }
+
         StringBuilder result = new StringBuilder();
         result.append("Reklamácia schválená!\n");
         if (customerWaits) {
             result.append("Zákazník počká na opravu jedla\n");
             result.append("25% zľava na ďalšiu objednávku");
         } else {
-            result.append("Zákazníkovi budú vrátené peniaze\n");
+            result.append("Zákazníkovi budú vrátené peniaze (odpočítané z účtu)\n");
             result.append("25% zľava na ďalšiu objednávku");
         }
 
@@ -169,6 +244,9 @@ public class ReklamaciaView extends VBox {
         statusLabel.setStyle("-fx-text-fill: green;");
         approveButton.setDisable(true);
         rejectButton.setDisable(true);
+        
+        // Refresh items list to show new quantities
+        polozkyList.refresh();
     }
 
     private void handleReject() {

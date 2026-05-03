@@ -1,5 +1,6 @@
 package ui;
 
+import java.util.List;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
@@ -115,14 +116,23 @@ public class PlatbaView extends VBox {
 
     public void refreshOrderList() {
         objednavkaCombo.getItems().clear();
-        objednavkaCombo.getItems().addAll(repository.getAllObjednavky());
+        objednavkaCombo.getItems().addAll(repository.getUnpaidObjednavky());
     }
 
     private void handleOrderSelected() {
         Objednavka selected = objednavkaCombo.getValue();
         if (selected != null && selected.getStav() >= 1) {
-            selectedOrder = selected;
-            currentUcet = platbaService.createUcet(selected.getPolozky());
+            // Re-load the order from repository to get updated quantities if they changed (e.g. after reclamation)
+            List<Objednavka> allUnpaid = repository.getUnpaidObjednavky();
+            for (Objednavka o : allUnpaid) {
+                if (o.getId() == selected.getId()) {
+                    selectedOrder = o;
+                    break;
+                }
+            }
+            if (selectedOrder == null) selectedOrder = selected;
+            
+            currentUcet = platbaService.createUcet(selectedOrder.getPolozky());
             updateAccountSummary();
         }
     }
@@ -164,6 +174,14 @@ public class PlatbaView extends VBox {
             return;
         }
 
+        // Check if already paid to prevent double payment
+        if (selectedOrder.getStav() == 4) {
+            showAlert("Táto objednávka už bola zaplatená!");
+            handleCancel();
+            refreshOrderList();
+            return;
+        }
+
         String method = paymentMethodCombo.getValue();
         Platba platba = platbaService.processPlatba(currentUcet, method);
 
@@ -173,6 +191,9 @@ public class PlatbaView extends VBox {
             statusLabel.setText("✓ Platba úspešne spracovaná!");
             statusLabel.setStyle("-fx-text-fill: green;");
             repository.createPlatba(ucetId, method, currentUcet.getFinalniSuma());
+            repository.updateObjednavkaStav(selectedOrder.getId(), 4);
+            repository.updateStolStav(selectedOrder.getStol().getId(), "volny");
+
             showAlert("Platba bola spracovaná. Ďakujeme!");
             handleCancel();
         }

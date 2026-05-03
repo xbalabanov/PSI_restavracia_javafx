@@ -58,6 +58,12 @@ public class Main extends Application {
         ObjednavkaView objednavkaView = new ObjednavkaView();
         Tab tab1 = new Tab("UC01 - Objednávka", objednavkaView);
         tab1.setStyle("-fx-text: black;");
+        tab1.setOnSelectionChanged(e -> {
+            if (tab1.isSelected()) {
+                objednavkaView.refreshTableList();
+                objednavkaView.refreshExistingOrders();
+            }
+        });
 
         // UC02 - Reklamácia
         ReklamaciaView reklamaciaView = new ReklamaciaView();
@@ -70,8 +76,14 @@ public class Main extends Application {
         });
 
         // UC03 - Rezervácia
-        Tab tab3 = new Tab("UC03 - Rezervácia", new RezervaciaView());
+        RezervaciaView rezervaciaView = new RezervaciaView();
+        Tab tab3 = new Tab("UC03 - Rezervácia", rezervaciaView);
         tab3.setStyle("-fx-text: black;");
+        tab3.setOnSelectionChanged(e -> {
+            if (tab3.isSelected()) {
+                rezervaciaView.refreshReservationList();
+            }
+        });
 
         // UC04 - Platba
         PlatbaView platbaView = new PlatbaView();

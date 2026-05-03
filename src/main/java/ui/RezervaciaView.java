@@ -21,6 +21,9 @@ public class RezervaciaView extends VBox {
     private TextArea notesArea;
     private Button createButton;
     private Button cancelButton;
+    private ListView<Rezervacia> reservationList;
+    private Button refreshButton;
+    private Button deleteButton;
     private Label statusLabel;
 
     private RezervaciaService rezervaciaService;
@@ -86,6 +89,42 @@ public class RezervaciaView extends VBox {
         HBox buttonBox = new HBox(10);
         buttonBox.getChildren().addAll(createButton, cancelButton);
 
+        Label managementLabel = new Label("Správa rezervácií:");
+        managementLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+
+        reservationList = new ListView<>();
+        reservationList.setPrefHeight(180);
+        reservationList.setCellFactory(lv -> new ListCell<Rezervacia>() {
+            @Override
+            protected void updateItem(Rezervacia item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setText("");
+                } else {
+                    setText("Rezervácia #" + item.getId()
+                            + " | " + item.getZakaznikMeno()
+                            + " | Stôl " + item.getStolId()
+                            + " | " + item.getPocetOsob() + " osôb"
+                            + " | " + item.getCas()
+                            + " | " + item.getStav());
+                }
+            }
+        });
+
+        refreshButton = new Button("Obnoviť zoznam");
+        refreshButton.setStyle("-fx-font-size: 12; -fx-padding: 8;");
+        refreshButton.setOnAction(e -> refreshReservationList());
+
+        deleteButton = new Button("Vymazať vybranú rezerváciu");
+        deleteButton.setStyle("-fx-font-size: 12; -fx-padding: 8; -fx-text-fill: white; -fx-background-color: #f44336;");
+        deleteButton.setOnAction(e -> handleDeleteRezervacia());
+
+        HBox managementButtonBox = new HBox(10);
+        managementButtonBox.getChildren().addAll(refreshButton, deleteButton);
+
+        refreshReservationList();
+
         this.getChildren().addAll(
                 titleLabel,
                 nameLabel, nameField,
@@ -95,7 +134,47 @@ public class RezervaciaView extends VBox {
                 personLabel, personCountSpinner,
                 notesLabel, notesArea,
                 buttonBox,
+                new Separator(),
+                managementLabel,
+                reservationList,
+                managementButtonBox,
                 statusLabel);
+    }
+
+    public void refreshReservationList() {
+        reservationList.getItems().clear();
+        reservationList.getItems().addAll(repository.getAllRezerbacie());
+    }
+
+    private void handleDeleteRezervacia() {
+        Rezervacia selected = reservationList.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            showAlert("Vyberte rezerváciu, ktorú chcete vymazať!");
+            return;
+        }
+
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Potvrdenie");
+        confirmAlert.setHeaderText("Vymazať rezerváciu?");
+        confirmAlert.setContentText("Naozaj chcete vymazať rezerváciu #" + selected.getId()
+                + " pre zákazníka " + selected.getZakaznikMeno() + "?");
+
+        if (confirmAlert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+            repository.deleteRezervacia(selected.getId());
+
+            if (selected.getStolId() > 0) {
+                repository.updateStolStav(selected.getStolId(), "volny");
+            }
+
+            statusLabel.setText("✓ Rezervácia bola vymazaná");
+            statusLabel.setStyle("-fx-text-fill: green; -fx-font-size: 12;");
+            refreshReservationList();
+        }
+    }
+
+    private void handleCancel() {
+        clearForm();
     }
 
     private void handleCreateRezervacia() {
@@ -136,15 +215,12 @@ public class RezervaciaView extends VBox {
             statusLabel.setStyle("-fx-text-fill: green; -fx-font-size: 12;");
             showAlert("Rezervácia úspešne vytvorená!\nStôl č. " + availableTable.getId());
             clearForm();
+            refreshReservationList();
         } else {
             statusLabel.setText("✗ Nie je dostupný vhodný stôl!");
             statusLabel.setStyle("-fx-text-fill: red; -fx-font-size: 12;");
             showAlert("Ľutujeme, nie je dostupný stôl vyhovujúcej veľkosti v požadovanom čase.");
         }
-    }
-
-    private void handleCancel() {
-        clearForm();
     }
 
     private void clearForm() {

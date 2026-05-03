@@ -16,7 +16,25 @@ public class Repository {
     public List<Stol> getAllStoly() {
         List<Stol> stoly = new ArrayList<>();
         try {
-            String sql = "SELECT * FROM stoly";
+            String sql = """
+                    SELECT s.id,
+                           CASE
+                               WHEN EXISTS (
+                                   SELECT 1
+                                   FROM objednavky o
+                                   LEFT JOIN ucty u ON u.objednavka_id = o.id
+                                   LEFT JOIN platby p ON p.ucet_id = u.id AND p.stav = 'vybavena'
+                                   WHERE o.stol_id = s.id
+                                     AND o.stav >= 1
+                                     AND p.id IS NULL
+                               ) THEN 'obsadeny'
+                               ELSE s.stav
+                           END AS stav,
+                           s.kapacita
+                    FROM stoly s
+                    ORDER BY s.id
+                    """;
+
             Statement stmt = connection.createStatement();
             ResultSet rs = stmt.executeQuery(sql);
 
@@ -100,12 +118,33 @@ public class Repository {
         }
     }
 
+    public void deleteObjednaneJedla(int objednavkaId) {
+        try {
+            String sql = "DELETE FROM objednane_jedla WHERE objednavka_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(sql);
+            stmt.setInt(1, objednavkaId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public List<Objednavka> getAllObjednavky() {
+        return getObjednavkyByStatus(-1);
+    }
+
+    public List<Objednavka> getObjednavkyByStatus(int status) {
         List<Objednavka> objednavky = new ArrayList<>();
         try {
             String sql = "SELECT * FROM objednavky";
-            Statement stmt = connection.createStatement();
-            ResultSet rs = stmt.executeQuery(sql);
+            if (status != -1) {
+                sql += " WHERE stav = ?";
+            }
+            PreparedStatement stmt = connection.prepareStatement(sql);
+            if (status != -1) {
+                stmt.setInt(1, status);
+            }
+            ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
                 Stol stol = new Stol();
@@ -165,6 +204,25 @@ public class Repository {
         }
     }
 
+    public void updateObjednaneJedloPocet(int objednaneJedloId, int novyPocet) {
+        try {
+            if (novyPocet <= 0) {
+                String sql = "DELETE FROM objednane_jedla WHERE id = ?";
+                PreparedStatement stmt = connection.prepareStatement(sql);
+                stmt.setInt(1, objednaneJedloId);
+                stmt.executeUpdate();
+            } else {
+                String sql = "UPDATE objednane_jedla SET pocet = ? WHERE id = ?";
+                PreparedStatement stmt = connection.prepareStatement(sql);
+                stmt.setInt(1, novyPocet);
+                stmt.setInt(2, objednaneJedloId);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void updateObjednavkaStav(int objednavkaId, int stav) {
         try {
             String sql = "UPDATE objednavky SET stav = ? WHERE id = ?";
@@ -178,6 +236,37 @@ public class Repository {
     }
 
     // === REZERVACIE (UC03) ===
+    public List<Objednavka> getUnpaidObjednavky() {
+        return getObjednavkyWithStatusNot(4);
+    }
+
+    public List<Objednavka> getObjednavkyWithStatusNot(int excludedStatus) {
+        List<Objednavka> objednavky = new ArrayList<>();
+        try {
+            String sql = "SELECT * FROM objednavky WHERE stav != ?";
+            PreparedStatement stmt = connection.prepareStatement(sql);
+            stmt.setInt(1, excludedStatus);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Stol stol = new Stol();
+                stol.setId(rs.getInt("stol_id"));
+
+                Objednavka objednavka = new Objednavka(
+                        rs.getInt("id"),
+                        rs.getInt("stav"),
+                        rs.getTimestamp("cas").toLocalDateTime(),
+                        stol);
+
+                loadObjednaneJedla(objednavka);
+                objednavky.add(objednavka);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return objednavky;
+    }
+
     public int createRezervacia(Rezervacia rezervacia) {
         try {
             String sql = "INSERT INTO rezervacie (stav, cas, stol_id, zakaznik_meno, zakaznik_kontakt, pocet_osob, poznamky) "
@@ -233,6 +322,17 @@ public class Repository {
             PreparedStatement stmt = connection.prepareStatement(sql);
             stmt.setString(1, stav);
             stmt.setInt(2, rezervaciaId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteRezervacia(int rezervaciaId) {
+        try {
+            String sql = "DELETE FROM rezervacie WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(sql);
+            stmt.setInt(1, rezervaciaId);
             stmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
